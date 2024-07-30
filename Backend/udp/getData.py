@@ -2,6 +2,8 @@ import socket
 import json
 from saveData import save_data
 
+
+
 UDP_IP = "127.0.0.1"
 UDP_PORT = 8182
 
@@ -34,3 +36,8 @@ while True:
 
     except (json.JSONDecodeError, KeyError) as e:
         print(f"Error parsing data: {e}")
+
+
+def get_json_data():
+    return clean_json_str
+
