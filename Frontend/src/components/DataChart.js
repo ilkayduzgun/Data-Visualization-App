@@ -4,7 +4,6 @@ import HighchartsReact from 'highcharts-react-official';
 import axios from 'axios';
 
 function DataChart() {
-  const [data, setData] = useState([]);
   const [chartOptions, setChartOptions] = useState({
     title: {
       text: 'Sensor Data'
@@ -12,51 +11,61 @@ function DataChart() {
     xAxis: {
       type: 'datetime'
     },
-    series: [
-      { name: 'Temperature', data: [] },
-      { name: 'Pressure', data: [] },
-      { name: 'Current', data: [] },
-      { name: 'Error', data: [] },
-    ]
+    series: []
   });
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchColumns = async () => {
+      try {
+        const response = await axios.get('http://127.0.0.1:8000/data/column_data/');
+        const columns = response.data.columns;
+        const initialSeries = columns.map(col => ({
+          name: col.charAt(0).toUpperCase() + col.slice(1),
+          data: []
+        }));
+
+        setChartOptions(prevOptions => ({
+          ...prevOptions,
+          series: initialSeries
+        }));
+
+        return columns;
+      } catch (error) {
+        console.error('Error fetching columns:', error);
+        return [];
+      }
+    };
+
+    const fetchData = async (columns) => {
       try {
         const response = await axios.get('http://127.0.0.1:8000/data/read_data/');
         const data = response.data;
-        console.log("Data: ", data);
 
-        const tempData = data.map(entry => [new Date(entry.time).getTime(), entry.temp]);
-        const pressureData = data.map(entry => [new Date(entry.time).getTime(), entry.pressure]);
-        const currentData = data.map(entry => [new Date(entry.time).getTime(), entry.current]);
-        const errorData = data.map(entry => [new Date(entry.time).getTime(), entry.error ? 1 : 0]);
+        const seriesData = columns.map(col => ({
+          name: col.charAt(0).toUpperCase() + col.slice(1),
+          data: data.map(entry => [
+            new Date(entry.time).getTime(),
+            typeof entry[col.toLowerCase()] === 'boolean' ? (entry[col.toLowerCase()] ? 1 : 0) : entry[col.toLowerCase()]
+          ])
+        }));
 
-        console.log(" Temp Data: ", tempData);
-        console.log(" Pressure Data: ", pressureData);
-        console.log(" Current Data: ", currentData);
-        console.log(" Error Data: ", errorData);
-
-        setChartOptions({
-          title: {
-            text: 'Sensor Data'
-          },
-          xAxis: {
-            type: 'datetime'
-          },
-          series: [
-            { name: 'Temperature', data: tempData },
-            { name: 'Pressure', data: pressureData },
-            { name: 'Current', data: currentData },
-            { name: 'Error', data: errorData },
-          ]
-        });
+        setChartOptions(prevOptions => ({
+          ...prevOptions,
+          series: seriesData
+        }));
       } catch (error) {
         console.error('Error fetching data:', error);
       }
     };
 
-    fetchData();
+    const initializeChart = async () => {
+      const columns = await fetchColumns();
+      if (columns.length > 0) {
+        await fetchData(columns);
+      }
+    };
+
+    initializeChart();
   }, []);
 
   return (

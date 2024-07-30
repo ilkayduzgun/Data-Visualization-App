@@ -2,8 +2,6 @@ import socket
 import json
 from saveData import save_data
 
-
-
 UDP_IP = "127.0.0.1"
 UDP_PORT = 8182
 
@@ -12,7 +10,7 @@ sock.bind((UDP_IP, UDP_PORT))
 
 print(f"Listening on {UDP_IP}:{UDP_PORT}")
 
-while True:
+def get_json_data():
     data, addr = sock.recvfrom(1024)
     print(f"Received raw data: {data}") 
 
@@ -33,11 +31,12 @@ while True:
             print(f"{key}: {value}")
 
         save_data(data_json)
+        return clean_json_str
 
     except (json.JSONDecodeError, KeyError) as e:
         print(f"Error parsing data: {e}")
+        return "{}"
 
-
-def get_json_data():
-    return clean_json_str
-
+if __name__ == "__main__":
+    while True:
+        get_json_data()
