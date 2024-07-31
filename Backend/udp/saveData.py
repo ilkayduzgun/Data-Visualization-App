@@ -23,3 +23,5 @@ def save_data(data_dict):
     point.time(datetime.datetime.utcnow(), WritePrecision.NS)
     write_api.write(bucket=bucket, org=org, record=point)
     print(f"Data saved to InfluxDB: {data_dict}")
+
+

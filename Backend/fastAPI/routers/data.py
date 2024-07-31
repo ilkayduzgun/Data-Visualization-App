@@ -1,15 +1,12 @@
 import json
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'udp')))
-
+import threading
 from fastapi import FastAPI, HTTPException, APIRouter
-from pydantic import BaseModel
-from typing import List
-
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'udp')))
 from database import write_api, query_api, bucket, org
 from models import sensor_data
-from udp.getData import get_json_data
+from udp.getData import data_queue, start_udp_listener
 
 router = APIRouter(
     prefix='/data',
@@ -38,16 +35,24 @@ def parse_records(records, columns):
         results.append(result)
     return results
 
+@router.on_event("startup")
+def startup_event():
+    udp_thread = threading.Thread(target=start_udp_listener, daemon=True)
+    udp_thread.start()
+
 @router.get("/read_data/")
 async def read_data():
     try:
-        clean_json_str = get_json_data()
-        print(f"Clean JSON data: {clean_json_str}")  
-        sample_json = json.loads(clean_json_str)
+        if data_queue:
+            data_json = data_queue.popleft()  
+            print(f"Dequeued JSON data: {data_json}")
+        else:
+            print("Data queue is empty")
+            raise HTTPException(status_code=500, detail="No data available")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"No data available: {str(e)}")
 
-    columns = list(sample_json.keys())
+    columns = list(data_json.keys())
     print(f"Columns derived from JSON data: {columns}")  
     query = create_query(["_time"] + columns)
     print(f"Generated InfluxDB query: {query}") 
@@ -62,13 +67,16 @@ async def read_data():
         print(f"Query failed with exception: {str(e)}")  
         raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
 
-
 @router.get("/column_data/")
 async def column_data():
     try:
-        clean_json_str = get_json_data()
-        sample_json = json.loads(clean_json_str)
-        columns = list(sample_json.keys())
+        if data_queue:
+            data_json = data_queue.popleft()  
+            print(f"Dequeued JSON data: {data_json}")
+        else:
+            print("Data queue is empty")
+            raise HTTPException(status_code=500, detail="No data available")
+        columns = list(data_json.keys())
         return {"columns": columns}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve columns: {str(e)}")
